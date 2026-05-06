@@ -19,7 +19,7 @@ public sealed class KeywordContentFilterTests
         var result = filter.Evaluate(item);
 
         result.IsRelevant.Should().BeTrue();
-        result.Score.Should().Be(3);
+        result.Score.Should().Be(7);
         result.MatchedPositiveKeywords.Should().BeEquivalentTo(".NET", "ASP.NET Core", "EF Core");
         result.MatchedNegativeKeywords.Should().BeEmpty();
     }
@@ -83,6 +83,52 @@ public sealed class KeywordContentFilterTests
         result.MatchedPositiveKeywords.Should().BeEquivalentTo("Angular", "TypeScript");
     }
 
+    [Fact]
+    public void Strong_keyword_can_make_item_relevant()
+    {
+        var filter = CreateFilter(minimumScore: 2);
+        var item = CreateItem(
+            title: "MCP server security update",
+            summary: "A security fix for AI agent tooling.");
+
+        var result = filter.Evaluate(item);
+
+        result.IsRelevant.Should().BeTrue();
+        result.Score.Should().BeGreaterThanOrEqualTo(6);
+        result.MatchedPositiveKeywords.Should().Contain(["MCP", "security", "AI agent"]);
+    }
+
+    [Fact]
+    public void Rejects_weak_demo_without_strong_signal()
+    {
+        var filter = CreateFilter(minimumScore: 2);
+        var item = CreateItem(
+            title: "Product demo showcase",
+            summary: "A tutorial and demo with no concrete technical change.");
+
+        var result = filter.Evaluate(item);
+
+        result.IsRelevant.Should().BeFalse();
+        result.Score.Should().Be(0);
+        result.MatchedPositiveKeywords.Should().BeEquivalentTo("demo", "showcase", "tutorial");
+        result.Reason.Should().Contain("weak keywords");
+    }
+
+    [Fact]
+    public void Penalizes_showcase_when_no_strong_keyword_matches()
+    {
+        var filter = CreateFilter(minimumScore: 2);
+        var item = CreateItem(
+            title: "Angular showcase demo",
+            summary: "A preview tutorial for UI ideas.");
+
+        var result = filter.Evaluate(item);
+
+        result.IsRelevant.Should().BeFalse();
+        result.Score.Should().Be(0);
+        result.MatchedPositiveKeywords.Should().Contain(["Angular", "showcase", "demo", "preview", "tutorial"]);
+    }
+
     private static KeywordContentFilter CreateFilter(int minimumScore = 1)
     {
         var options = new FilterOptions
@@ -91,10 +137,24 @@ public sealed class KeywordContentFilterTests
             [
                 ".NET",
                 "C#",
-                "ASP.NET Core",
-                "EF Core",
                 "Angular",
                 "TypeScript"
+            ],
+            StrongPositiveKeywords =
+            [
+                "security",
+                "breaking change",
+                "EF Core",
+                "ASP.NET Core",
+                "AI agent",
+                "MCP"
+            ],
+            WeakPositiveKeywords =
+            [
+                "preview",
+                "showcase",
+                "demo",
+                "tutorial"
             ],
             NegativeKeywords =
             [
@@ -103,7 +163,11 @@ public sealed class KeywordContentFilterTests
                 "sponsored",
                 "marketing"
             ],
-            MinimumScore = minimumScore
+            MinimumScore = minimumScore,
+            PositiveKeywordWeight = 1,
+            StrongKeywordWeight = 3,
+            WeakKeywordWeight = 0,
+            WeakKeywordPenalty = 1
         };
 
         return new KeywordContentFilter(Options.Create(options));

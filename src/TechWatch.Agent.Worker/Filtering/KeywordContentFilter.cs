@@ -17,8 +17,25 @@ public sealed class KeywordContentFilter(IOptions<FilterOptions> options) : ICon
             item.Content);
 
         var positiveMatches = FindMatches(searchableText, options.PositiveKeywords);
+        var strongMatches = FindMatches(searchableText, options.StrongPositiveKeywords);
+        var weakMatches = FindMatches(searchableText, options.WeakPositiveKeywords);
         var negativeMatches = FindMatches(searchableText, options.NegativeKeywords);
-        var score = positiveMatches.Count;
+        var matchedPositiveKeywords = positiveMatches
+            .Concat(strongMatches)
+            .Concat(weakMatches)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var score =
+            positiveMatches.Count * options.PositiveKeywordWeight
+            + strongMatches.Count * options.StrongKeywordWeight
+            + weakMatches.Count * options.WeakKeywordWeight;
+
+        if (weakMatches.Count > 0 && strongMatches.Count == 0)
+        {
+            score -= options.WeakKeywordPenalty;
+        }
+
+        score = Math.Max(0, score);
 
         if (negativeMatches.Count > 0)
         {
@@ -26,9 +43,21 @@ public sealed class KeywordContentFilter(IOptions<FilterOptions> options) : ICon
             {
                 IsRelevant = false,
                 Score = score,
-                MatchedPositiveKeywords = positiveMatches,
+                MatchedPositiveKeywords = matchedPositiveKeywords,
                 MatchedNegativeKeywords = negativeMatches,
                 Reason = "Rejected because negative keywords matched."
+            };
+        }
+
+        if (weakMatches.Count > 0 && strongMatches.Count == 0 && score < options.MinimumScore)
+        {
+            return new ContentFilterResult
+            {
+                IsRelevant = false,
+                Score = score,
+                MatchedPositiveKeywords = matchedPositiveKeywords,
+                MatchedNegativeKeywords = negativeMatches,
+                Reason = "Rejected because weak keywords matched without a strong technical signal."
             };
         }
 
@@ -38,7 +67,7 @@ public sealed class KeywordContentFilter(IOptions<FilterOptions> options) : ICon
             {
                 IsRelevant = false,
                 Score = score,
-                MatchedPositiveKeywords = positiveMatches,
+                MatchedPositiveKeywords = matchedPositiveKeywords,
                 MatchedNegativeKeywords = negativeMatches,
                 Reason = "Rejected because the score is below the minimum."
             };
@@ -48,7 +77,7 @@ public sealed class KeywordContentFilter(IOptions<FilterOptions> options) : ICon
         {
             IsRelevant = true,
             Score = score,
-            MatchedPositiveKeywords = positiveMatches,
+            MatchedPositiveKeywords = matchedPositiveKeywords,
             MatchedNegativeKeywords = negativeMatches,
             Reason = "Accepted because positive keyword score meets the minimum."
         };
