@@ -5,9 +5,11 @@ using TechWatch.Agent.Worker.Configuration;
 
 namespace TechWatch.Agent.Worker.Storage;
 
-public sealed class DatabaseInitializer(IOptions<StorageOptions> options)
+public sealed class DatabaseInitializer(
+    IOptions<StorageOptions> options,
+    AppPathResolver pathResolver)
 {
-    private readonly string connectionString = options.Value.ConnectionString;
+    private readonly string connectionString = pathResolver.ResolveSqliteConnectionString(options.Value.ConnectionString);
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {

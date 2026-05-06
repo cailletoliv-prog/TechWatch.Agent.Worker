@@ -77,8 +77,8 @@ public sealed class OllamaContentAnalyzerTests
         result.TechItemId.Should().Be(item.Id);
         result.InterestScore.Should().Be(0);
         result.Importance.Should().Be("Unknown");
-        result.Summary.Should().Be("Analysis unavailable.");
-        result.Reason.Should().Contain("could not be parsed");
+        result.Summary.Should().Be("Analyse indisponible.");
+        result.Reason.Should().Contain("reponse Ollama");
     }
 
     private static TechItem CreateItem()

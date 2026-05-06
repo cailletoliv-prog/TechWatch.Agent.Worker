@@ -16,11 +16,13 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
     [Fact]
     public async Task Generate_async_writes_markdown_digest_with_expected_sections()
     {
-        var generator = new MarkdownDigestGenerator(Options.Create(new DigestOptions
-        {
-            OutputDirectory = outputDirectory,
-            FileNameFormat = "yyyy-MM-dd"
-        }));
+        var generator = new MarkdownDigestGenerator(
+            Options.Create(new DigestOptions
+            {
+                OutputDirectory = outputDirectory,
+                FileNameFormat = "yyyy-MM-dd"
+            }),
+            CreatePathResolver());
         var runDate = DateTimeOffset.Parse("2026-05-06T10:00:00Z");
         var entries = new[]
         {
@@ -35,7 +37,7 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         Path.GetFileName(run.OutputPath).Should().Be("2026-05-06.md");
         File.Exists(run.OutputPath).Should().BeTrue();
         var markdown = await File.ReadAllTextAsync(run.OutputPath);
-        markdown.Should().Contain("# Tech Watch Digest - 2026-05-06");
+        markdown.Should().Contain("# Tech Watch Digest - 06/05/2026");
         markdown.Should().Contain("## Highlights");
         markdown.Should().Contain("## Breaking changes");
         markdown.Should().Contain("## Articles");
@@ -43,7 +45,14 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         markdown.IndexOf("Highlight item", StringComparison.Ordinal)
             .Should().BeLessThan(markdown.IndexOf("Article item", StringComparison.Ordinal));
         markdown.Should().Contain("- Score: 9/10");
+        markdown.Should().Contain("- Published: 06/05/2026");
         markdown.Should().Contain("- Tags: dotnet, aspnetcore");
+        markdown.Should().Contain("Impact:");
+        markdown.Should().Contain("A retenir:");
+        markdown.IndexOf("## Highlights", StringComparison.Ordinal)
+            .Should().BeLessThan(markdown.IndexOf("Highlight item", StringComparison.Ordinal));
+        markdown.IndexOf("## Breaking changes", StringComparison.Ordinal)
+            .Should().BeLessThan(markdown.IndexOf("Breaking item", StringComparison.Ordinal));
     }
 
     public void Dispose()
@@ -74,5 +83,10 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
             Reason = $"{title} reason.",
             PublishedAt = DateTimeOffset.Parse("2026-05-06T08:00:00Z")
         };
+    }
+
+    private static AppPathResolver CreatePathResolver()
+    {
+        return new AppPathResolver(Options.Create(new PathOptions()));
     }
 }

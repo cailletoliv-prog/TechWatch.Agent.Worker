@@ -9,9 +9,10 @@ namespace TechWatch.Agent.Worker.Storage;
 
 public sealed class SqliteTechItemRepository(
     IOptions<StorageOptions> options,
-    DatabaseInitializer databaseInitializer) : ITechItemRepository
+    DatabaseInitializer databaseInitializer,
+    AppPathResolver pathResolver) : ITechItemRepository
 {
-    private readonly string connectionString = options.Value.ConnectionString;
+    private readonly string connectionString = pathResolver.ResolveSqliteConnectionString(options.Value.ConnectionString);
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {

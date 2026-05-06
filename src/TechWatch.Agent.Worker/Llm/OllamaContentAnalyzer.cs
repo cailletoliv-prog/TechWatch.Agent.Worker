@@ -57,18 +57,45 @@ public sealed class OllamaContentAnalyzer(IOllamaClient ollamaClient) : IContent
     private static string BuildPrompt(TechItem item)
     {
         return $$"""
-            You are a technical watch assistant focused on C#, .NET, ASP.NET Core, EF Core, Oracle, Angular, and AI-assisted development.
+            You are a senior technical watch assistant for a lead developer working mainly with:
+            C#, .NET, ASP.NET Core, EF Core, Oracle, Angular, TypeScript, and AI-assisted software development.
 
-            Analyze this technical item and answer with strict JSON only. Do not include markdown or explanations outside JSON.
+            Analyze this item for that profile. Answer with strict JSON only. Do not include markdown or explanations outside JSON.
+
+            Keep the original title and source language untouched in your reasoning, but write summary, importance, reason, and any impact wording in natural, professional French.
+            Use a sober, factual, senior developer tone. Avoid promotional wording and overconfident conclusions.
+            Do not claim that the item directly impacts our projects unless the text explicitly proves it.
+            Prefer formulations such as "peut etre pertinent", "a surveiller", "a verifier dans nos contextes", or "faible priorite" when the impact is indirect.
+            Avoid "nous devons", "il est essentiel", and "crucial" unless the item is a real security issue or a confirmed major breaking change.
+            Avoid literal or awkward translations. Do not translate standard technical terms when they are commonly used in French technical teams.
+            Keep terms such as MCP, tooling, breaking change, workflow, security, endpoint, runtime, SDK, release notes, migration, API, preview, LTS, CI/CD, and performance in English when appropriate.
+            Never invent odd French words for established English technical terms.
+            Preferred French wording examples: "multi-tours", "nettoyer la reponse", "filtrer la reponse", "controle des appels MCP".
+
+            Scoring guidance:
+            - 9-10: critical security, major confirmed breaking change, or strong direct impact for the profile.
+            - 7-8: important topic for architecture, framework usage, migration, performance, tooling, or roadmap.
+            - 5-6: interesting but optional.
+            - 0-4: low priority, marketing, duplicate, vague, or not directly useful for the profile.
+
+            Tags rules:
+            - Use only topics explicitly present in the item.
+            - Prefer concise tags such as dotnet, aspnetcore, efcore, oracle, angular, typescript, ai-dev, tooling, performance, security.
+            - Do not invent tags.
+
+            Field guidance:
+            - summary: 2-4 short factual sentences in natural professional French. Mention concrete impact only when supported by the item.
+            - reason: explain in natural professional French what to retain, or why it can be low priority.
+            - isBreakingChange: true only if the item mentions or strongly implies migration risk, removed APIs, changed defaults, incompatible behavior, or required action.
 
             Expected JSON shape:
             {
               "interestScore": 0,
-              "summary": "short summary",
+              "summary": "resume actionnable en francais naturel et professionnel",
               "importance": "Low|Medium|High",
               "isBreakingChange": false,
               "tags": ["tag"],
-              "reason": "short reason"
+              "reason": "raison en francais naturel et professionnel"
             }
 
             Item:
@@ -87,11 +114,11 @@ public sealed class OllamaContentAnalyzer(IOllamaClient ollamaClient) : IContent
         {
             TechItemId = techItemId,
             InterestScore = 0,
-            Summary = "Analysis unavailable.",
+            Summary = "Analyse indisponible.",
             Importance = "Unknown",
             HasBreakingChange = false,
             Tags = [],
-            Reason = "Ollama response could not be parsed."
+            Reason = "La reponse Ollama n'a pas pu etre analysee."
         };
     }
 

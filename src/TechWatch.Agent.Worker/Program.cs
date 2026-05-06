@@ -28,11 +28,16 @@ builder.Services
     .AddOptions<DigestOptions>()
     .BindConfiguration($"{TechWatchOptions.SectionName}:Digest")
     .ValidateDataAnnotations();
+builder.Services
+    .AddOptions<PathOptions>()
+    .BindConfiguration($"{TechWatchOptions.SectionName}:Paths")
+    .ValidateDataAnnotations();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IContentFilter, KeywordContentFilter>();
 builder.Services.AddSingleton<ISourceReader, RssSourceReader>();
 builder.Services.AddSingleton<ISourceAggregator, SourceAggregator>();
+builder.Services.AddSingleton<AppPathResolver>();
 builder.Services.AddSingleton<DatabaseInitializer>();
 builder.Services.AddSingleton<ITechItemRepository, SqliteTechItemRepository>();
 builder.Services.AddSingleton<IOllamaClient, OllamaClient>();

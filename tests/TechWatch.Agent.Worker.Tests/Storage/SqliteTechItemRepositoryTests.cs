@@ -108,9 +108,10 @@ public sealed class SqliteTechItemRepositoryTests : IDisposable
         {
             ConnectionString = $"Data Source={databasePath};Pooling=False"
         });
-        var initializer = new DatabaseInitializer(options);
+        var pathResolver = new AppPathResolver(Options.Create(new PathOptions()));
+        var initializer = new DatabaseInitializer(options, pathResolver);
 
-        return new SqliteTechItemRepository(options, initializer);
+        return new SqliteTechItemRepository(options, initializer, pathResolver);
     }
 
     private static TechItem CreateItem(
