@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using TechWatch.Agent.Worker.Configuration;
 using TechWatch.Agent.Worker.Digests;
@@ -150,6 +151,33 @@ public sealed class TechWatchPipeline(
             "digest generated: entries {EntryCount}; output {OutputPath}",
             digestRun.Entries.Count,
             digestRun.OutputPath);
+
+        OpenDigest(digestRun.OutputPath);
+    }
+
+    private void OpenDigest(string outputPath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(outputPath) || !File.Exists(outputPath))
+            {
+                logger.LogWarning("digest could not be opened because the file does not exist: {OutputPath}", outputPath);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = outputPath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "digest could not be opened: {OutputPath}",
+                outputPath);
+        }
     }
 
     private static TechItem MarkPendingAnalysis(TechItem item)

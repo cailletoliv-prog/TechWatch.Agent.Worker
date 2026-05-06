@@ -42,13 +42,13 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         File.Exists(run.OutputPath).Should().BeTrue();
         var markdown = await File.ReadAllTextAsync(run.OutputPath);
         markdown.Should().Contain("# Tech Watch Digest - 06/05/2026");
-        markdown.Should().Contain("## Securite / Breaking changes");
+        markdown.Should().Contain("## Sécurité / Breaking changes");
         markdown.Should().Contain("## IA / Agents");
         markdown.Should().Contain("## .NET / ASP.NET Core");
         markdown.Should().Contain("## EF Core / Data");
         markdown.Should().Contain("## Tooling / Dev productivity");
-        markdown.Should().Contain("## A surveiller");
-        markdown.Should().Contain("## Faible priorite");
+        markdown.Should().Contain("## À surveiller");
+        markdown.Should().Contain("## Faible priorité");
         markdown.IndexOf("Dotnet high item", StringComparison.Ordinal)
             .Should().BeLessThan(markdown.IndexOf("Dotnet medium item", StringComparison.Ordinal));
         markdown.Should().Contain("- Score: 9/10");
@@ -56,7 +56,7 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         markdown.Should().Contain("- Tags: dotnet");
         markdown.Should().Contain("Impact:");
         markdown.Should().Contain("A retenir:");
-        markdown.IndexOf("## Securite / Breaking changes", StringComparison.Ordinal)
+        markdown.IndexOf("## Sécurité / Breaking changes", StringComparison.Ordinal)
             .Should().BeLessThan(markdown.IndexOf("Breaking item", StringComparison.Ordinal));
         CountOccurrences(markdown, "### [Breaking item]").Should().Be(1);
     }

@@ -62,13 +62,13 @@ public sealed class MarkdownDigestGenerator(
             .ToArray();
         var categoryTitles = new[]
         {
-            "Securite / Breaking changes",
+            "Sécurité / Breaking changes",
             "IA / Agents",
             ".NET / ASP.NET Core",
             "EF Core / Data",
             "Tooling / Dev productivity",
-            "A surveiller",
-            "Faible priorite"
+            "À surveiller",
+            "Faible priorité"
         };
 
         return categoryTitles
@@ -82,12 +82,12 @@ public sealed class MarkdownDigestGenerator(
     {
         if (IsSecurityOrBreakingChange(entry))
         {
-            return "Securite / Breaking changes";
+            return "Sécurité / Breaking changes";
         }
 
         if (entry.InterestScore < 5)
         {
-            return "Faible priorite";
+            return "Faible priorité";
         }
 
         if (HasAnyTag(entry, "ai-dev", "ai", "llm", "agent", "agents", "mcp"))
@@ -110,7 +110,7 @@ public sealed class MarkdownDigestGenerator(
             return "Tooling / Dev productivity";
         }
 
-        return "A surveiller";
+        return "À surveiller";
     }
 
     private static bool IsSecurityOrBreakingChange(DigestEntry entry)
