@@ -45,12 +45,82 @@ public sealed class MarkdownDigestGenerator(
         builder.AppendLine($"# Tech Watch Digest - {runDate:dd/MM/yyyy}");
         builder.AppendLine();
 
-        AppendSection(builder, "Highlights", entries.Where(entry => entry.InterestScore >= 8 && !entry.HasBreakingChange));
-        AppendSection(builder, "Breaking changes", entries.Where(entry => entry.HasBreakingChange));
-        AppendSection(builder, "Articles", entries.Where(entry => entry.InterestScore is >= 5 and < 8 && !entry.HasBreakingChange));
-        AppendSection(builder, "Low priority", entries.Where(entry => entry.InterestScore < 5 && !entry.HasBreakingChange));
+        var categorizedEntries = Categorize(entries);
+        foreach (var category in categorizedEntries)
+        {
+            AppendSection(builder, category.Title, category.Entries);
+        }
 
         return builder.ToString();
+    }
+
+    private static IReadOnlyCollection<DigestCategory> Categorize(IReadOnlyCollection<DigestEntry> entries)
+    {
+        var orderedEntries = entries
+            .OrderByDescending(entry => entry.InterestScore)
+            .ThenByDescending(entry => entry.PublishedAt)
+            .ToArray();
+        var categoryTitles = new[]
+        {
+            "Securite / Breaking changes",
+            "IA / Agents",
+            ".NET / ASP.NET Core",
+            "EF Core / Data",
+            "Tooling / Dev productivity",
+            "A surveiller",
+            "Faible priorite"
+        };
+
+        return categoryTitles
+            .Select(title => new DigestCategory(
+                title,
+                orderedEntries.Where(entry => GetCategoryTitle(entry) == title).ToArray()))
+            .ToArray();
+    }
+
+    private static string GetCategoryTitle(DigestEntry entry)
+    {
+        if (IsSecurityOrBreakingChange(entry))
+        {
+            return "Securite / Breaking changes";
+        }
+
+        if (entry.InterestScore < 5)
+        {
+            return "Faible priorite";
+        }
+
+        if (HasAnyTag(entry, "ai-dev", "ai", "llm", "agent", "agents", "mcp"))
+        {
+            return "IA / Agents";
+        }
+
+        if (HasAnyTag(entry, "dotnet", ".net", "aspnetcore", "asp.net core", "csharp", "c#"))
+        {
+            return ".NET / ASP.NET Core";
+        }
+
+        if (HasAnyTag(entry, "efcore", "ef core", "entity framework", "data", "oracle", "sql"))
+        {
+            return "EF Core / Data";
+        }
+
+        if (HasAnyTag(entry, "tooling", "productivity", "dev productivity", "workflow", "ci/cd", "sdk"))
+        {
+            return "Tooling / Dev productivity";
+        }
+
+        return "A surveiller";
+    }
+
+    private static bool IsSecurityOrBreakingChange(DigestEntry entry)
+    {
+        return entry.HasBreakingChange || HasAnyTag(entry, "security", "breaking-change", "breaking change");
+    }
+
+    private static bool HasAnyTag(DigestEntry entry, params string[] expectedTags)
+    {
+        return entry.Tags.Any(tag => expectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase));
     }
 
     private static void AppendSection(
@@ -103,4 +173,8 @@ public sealed class MarkdownDigestGenerator(
             builder.AppendLine();
         }
     }
+
+    private sealed record DigestCategory(
+        string Title,
+        IReadOnlyCollection<DigestEntry> Entries);
 }

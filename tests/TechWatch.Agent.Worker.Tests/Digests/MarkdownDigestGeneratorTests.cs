@@ -26,10 +26,14 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         var runDate = DateTimeOffset.Parse("2026-05-06T10:00:00Z");
         var entries = new[]
         {
-            CreateEntry("Low item", 3, breakingChange: false),
-            CreateEntry("Highlight item", 9, breakingChange: false),
-            CreateEntry("Breaking item", 7, breakingChange: true),
-            CreateEntry("Article item", 6, breakingChange: false)
+            CreateEntry("Low item", 3, breakingChange: false, tags: ["tutorial"]),
+            CreateEntry("AI item", 7, breakingChange: false, tags: ["mcp", "ai-dev"]),
+            CreateEntry("Dotnet high item", 9, breakingChange: false, tags: ["dotnet"]),
+            CreateEntry("Dotnet medium item", 6, breakingChange: false, tags: ["aspnetcore"]),
+            CreateEntry("Data item", 7, breakingChange: false, tags: ["efcore"]),
+            CreateEntry("Tooling item", 6, breakingChange: false, tags: ["tooling"]),
+            CreateEntry("Watch item", 5, breakingChange: false, tags: ["roadmap"]),
+            CreateEntry("Breaking item", 7, breakingChange: true, tags: ["dotnet", "breaking-change"])
         };
 
         var run = await generator.GenerateAsync(entries, runDate, CancellationToken.None);
@@ -38,21 +42,23 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
         File.Exists(run.OutputPath).Should().BeTrue();
         var markdown = await File.ReadAllTextAsync(run.OutputPath);
         markdown.Should().Contain("# Tech Watch Digest - 06/05/2026");
-        markdown.Should().Contain("## Highlights");
-        markdown.Should().Contain("## Breaking changes");
-        markdown.Should().Contain("## Articles");
-        markdown.Should().Contain("## Low priority");
-        markdown.IndexOf("Highlight item", StringComparison.Ordinal)
-            .Should().BeLessThan(markdown.IndexOf("Article item", StringComparison.Ordinal));
+        markdown.Should().Contain("## Securite / Breaking changes");
+        markdown.Should().Contain("## IA / Agents");
+        markdown.Should().Contain("## .NET / ASP.NET Core");
+        markdown.Should().Contain("## EF Core / Data");
+        markdown.Should().Contain("## Tooling / Dev productivity");
+        markdown.Should().Contain("## A surveiller");
+        markdown.Should().Contain("## Faible priorite");
+        markdown.IndexOf("Dotnet high item", StringComparison.Ordinal)
+            .Should().BeLessThan(markdown.IndexOf("Dotnet medium item", StringComparison.Ordinal));
         markdown.Should().Contain("- Score: 9/10");
         markdown.Should().Contain("- Published: 06/05/2026");
-        markdown.Should().Contain("- Tags: dotnet, aspnetcore");
+        markdown.Should().Contain("- Tags: dotnet");
         markdown.Should().Contain("Impact:");
         markdown.Should().Contain("A retenir:");
-        markdown.IndexOf("## Highlights", StringComparison.Ordinal)
-            .Should().BeLessThan(markdown.IndexOf("Highlight item", StringComparison.Ordinal));
-        markdown.IndexOf("## Breaking changes", StringComparison.Ordinal)
+        markdown.IndexOf("## Securite / Breaking changes", StringComparison.Ordinal)
             .Should().BeLessThan(markdown.IndexOf("Breaking item", StringComparison.Ordinal));
+        CountOccurrences(markdown, "### [Breaking item]").Should().Be(1);
     }
 
     public void Dispose()
@@ -66,7 +72,8 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
     private static DigestEntry CreateEntry(
         string title,
         int score,
-        bool breakingChange)
+        bool breakingChange,
+        IReadOnlyCollection<string> tags)
     {
         return new DigestEntry
         {
@@ -79,10 +86,24 @@ public sealed class MarkdownDigestGeneratorTests : IDisposable
             InterestScore = score,
             Importance = score >= 8 ? "High" : "Medium",
             HasBreakingChange = breakingChange,
-            Tags = ["dotnet", "aspnetcore"],
+            Tags = tags,
             Reason = $"{title} reason.",
             PublishedAt = DateTimeOffset.Parse("2026-05-06T08:00:00Z")
         };
+    }
+
+    private static int CountOccurrences(string value, string pattern)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = value.IndexOf(pattern, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += pattern.Length;
+        }
+
+        return count;
     }
 
     private static AppPathResolver CreatePathResolver()
