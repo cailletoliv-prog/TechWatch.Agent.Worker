@@ -18,7 +18,13 @@ public sealed class DigestEntry
 
     public int InterestScore { get; init; }
 
+    public string Importance { get; init; } = string.Empty;
+
     public bool HasBreakingChange { get; init; }
+
+    public IReadOnlyCollection<string> Tags { get; init; } = [];
+
+    public string Reason { get; init; } = string.Empty;
 
     public DateTimeOffset PublishedAt { get; init; }
 }

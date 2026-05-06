@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using TechWatch.Agent.Worker.Configuration;
+using TechWatch.Agent.Worker.Digests;
 using TechWatch.Agent.Worker.Filtering;
 using TechWatch.Agent.Worker.Llm;
 using TechWatch.Agent.Worker.Models;
@@ -21,7 +22,9 @@ public sealed class TechWatchPipelineTests
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
         var analyzer = Substitute.For<IContentAnalyzer>();
+        var digestGenerator = Substitute.For<IDigestGenerator>();
         var logger = new TestLogger<TechWatchPipeline>();
+        ConfigureDigest(repository, digestGenerator);
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -31,7 +34,7 @@ public sealed class TechWatchPipelineTests
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
-        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, digestGenerator, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
@@ -49,8 +52,10 @@ public sealed class TechWatchPipelineTests
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
         var analyzer = Substitute.For<IContentAnalyzer>();
+        var digestGenerator = Substitute.For<IDigestGenerator>();
         var logger = new TestLogger<TechWatchPipeline>();
         var item = CreateItem("ASP.NET Core release notes");
+        ConfigureDigest(repository, digestGenerator);
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -71,7 +76,7 @@ public sealed class TechWatchPipelineTests
         repository
             .UpsertAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
-        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, digestGenerator, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
@@ -93,8 +98,10 @@ public sealed class TechWatchPipelineTests
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
         var analyzer = Substitute.For<IContentAnalyzer>();
+        var digestGenerator = Substitute.For<IDigestGenerator>();
         var logger = new TestLogger<TechWatchPipeline>();
         var item = CreateItem("Crypto marketing campaign");
+        ConfigureDigest(repository, digestGenerator);
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -112,7 +119,7 @@ public sealed class TechWatchPipelineTests
                 Score = 0,
                 Reason = "Rejected by test."
             });
-        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, digestGenerator, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
@@ -129,14 +136,16 @@ public sealed class TechWatchPipelineTests
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
         var analyzer = Substitute.For<IContentAnalyzer>();
+        var digestGenerator = Substitute.For<IDigestGenerator>();
         var logger = new TestLogger<TechWatchPipeline>();
+        ConfigureDigest(repository, digestGenerator);
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns<Task<IReadOnlyCollection<TechItem>>>(_ => throw new InvalidOperationException("Fetch failed."));
-        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, digestGenerator, logger);
 
         var act = () => pipeline.RunAsync(CancellationToken.None);
 
@@ -153,7 +162,9 @@ public sealed class TechWatchPipelineTests
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
         var analyzer = Substitute.For<IContentAnalyzer>();
+        var digestGenerator = Substitute.For<IDigestGenerator>();
         var logger = new TestLogger<TechWatchPipeline>();
+        ConfigureDigest(repository, digestGenerator);
         var pendingItems = new[]
         {
             CreateItem("Pending item 1"),
@@ -190,6 +201,7 @@ public sealed class TechWatchPipelineTests
             contentFilter,
             repository,
             analyzer,
+            digestGenerator,
             logger,
             maxItemsPerRun: 1);
 
@@ -218,6 +230,7 @@ public sealed class TechWatchPipelineTests
         IContentFilter contentFilter,
         ITechItemRepository repository,
         IContentAnalyzer analyzer,
+        IDigestGenerator digestGenerator,
         ILogger<TechWatchPipeline> logger,
         int maxItemsPerRun = 5)
     {
@@ -226,11 +239,27 @@ public sealed class TechWatchPipelineTests
             contentFilter,
             repository,
             analyzer,
+            digestGenerator,
             Options.Create(new OllamaOptions
             {
                 MaxItemsPerRun = maxItemsPerRun
             }),
             logger);
+    }
+
+    private static void ConfigureDigest(
+        ITechItemRepository repository,
+        IDigestGenerator digestGenerator)
+    {
+        repository
+            .GetRecentAnalysisResultsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<DigestEntry>>([]));
+        digestGenerator
+            .GenerateAsync(Arg.Any<IReadOnlyCollection<DigestEntry>>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new DigestRun
+            {
+                OutputPath = "output/digests/test.md"
+            }));
     }
 
     private sealed class TestLogger<T> : ILogger<T>

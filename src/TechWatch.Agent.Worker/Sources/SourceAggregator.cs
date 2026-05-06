@@ -16,8 +16,11 @@ public sealed class SourceAggregator(
         CancellationToken cancellationToken)
     {
         var items = new List<TechItem>();
+        var enabledSources = sources.Where(source => source.Enabled).ToArray();
 
-        foreach (var source in sources.Where(source => source.Enabled))
+        logger.LogInformation("fetch started: enabled sources {SourceCount}", enabledSources.Length);
+
+        foreach (var source in enabledSources)
         {
             var reader = readers.FirstOrDefault(reader => reader.SourceType == source.Type);
             if (reader is null)
@@ -28,7 +31,13 @@ public sealed class SourceAggregator(
 
             try
             {
-                items.AddRange(await reader.ReadAsync(source, cancellationToken));
+                var sourceItems = await reader.ReadAsync(source, cancellationToken);
+                items.AddRange(sourceItems);
+
+                logger.LogInformation(
+                    "source fetched: source {SourceName}; items {ItemCount}",
+                    source.Name,
+                    sourceItems.Count);
             }
             catch (OperationCanceledException)
             {
@@ -43,6 +52,8 @@ public sealed class SourceAggregator(
                     source.Url);
             }
         }
+
+        logger.LogInformation("fetch completed: fetched items {ItemCount}", items.Count);
 
         return items;
     }

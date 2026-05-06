@@ -25,4 +25,8 @@ public interface ITechItemRepository
     Task MarkAnalysisFailedAsync(
         Guid techItemId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyCollection<DigestEntry>> GetRecentAnalysisResultsAsync(
+        DateTimeOffset since,
+        CancellationToken cancellationToken);
 }

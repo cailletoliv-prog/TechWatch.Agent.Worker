@@ -213,6 +213,40 @@ public sealed class SqliteTechItemRepository(
                 cancellationToken: cancellationToken));
     }
 
+    public async Task<IReadOnlyCollection<DigestEntry>> GetRecentAnalysisResultsAsync(
+        DateTimeOffset since,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        var rows = await connection.QueryAsync<DigestEntryRow>(
+            new CommandDefinition(
+                """
+                SELECT
+                    ti.Id AS TechItemId,
+                    ar.Id AS AnalysisResultId,
+                    ti.Title,
+                    ti.Url,
+                    ti.SourceName,
+                    ti.PublishedAt,
+                    ar.Summary,
+                    ar.InterestScore,
+                    ar.Importance,
+                    ar.HasBreakingChange,
+                    ar.TagsJson,
+                    ar.Reason
+                FROM AnalysisResults ar
+                INNER JOIN TechItems ti ON ti.Id = ar.TechItemId
+                WHERE ar.AnalyzedAt >= @Since
+                ORDER BY ar.InterestScore DESC, ti.PublishedAt DESC;
+                """,
+                new { Since = since.ToString("O") },
+                cancellationToken: cancellationToken));
+
+        return rows.Select(ToDigestEntry).ToArray();
+    }
+
     private static TechItem ToTechItem(TechItemRow row)
     {
         return new TechItem
@@ -228,6 +262,37 @@ public sealed class SqliteTechItemRepository(
             Content = row.Content,
             Status = (TechItemStatus)row.Status
         };
+    }
+
+    private static DigestEntry ToDigestEntry(DigestEntryRow row)
+    {
+        return new DigestEntry
+        {
+            TechItemId = Guid.Parse(row.TechItemId),
+            AnalysisResultId = Guid.Parse(row.AnalysisResultId),
+            Title = row.Title,
+            Url = row.Url,
+            SourceName = row.SourceName,
+            PublishedAt = DateTimeOffset.Parse(row.PublishedAt),
+            Summary = row.Summary,
+            InterestScore = row.InterestScore,
+            Importance = row.Importance,
+            HasBreakingChange = row.HasBreakingChange == 1,
+            Tags = DeserializeTags(row.TagsJson),
+            Reason = row.Reason
+        };
+    }
+
+    private static IReadOnlyCollection<string> DeserializeTags(string tagsJson)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<IReadOnlyCollection<string>>(tagsJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private sealed class TechItemRow
@@ -251,5 +316,32 @@ public sealed class SqliteTechItemRepository(
         public int Status { get; init; }
 
         public string CreatedAt { get; init; } = string.Empty;
+    }
+
+    private sealed class DigestEntryRow
+    {
+        public string TechItemId { get; init; } = string.Empty;
+
+        public string AnalysisResultId { get; init; } = string.Empty;
+
+        public string Title { get; init; } = string.Empty;
+
+        public string Url { get; init; } = string.Empty;
+
+        public string SourceName { get; init; } = string.Empty;
+
+        public string PublishedAt { get; init; } = string.Empty;
+
+        public string Summary { get; init; } = string.Empty;
+
+        public int InterestScore { get; init; }
+
+        public string Importance { get; init; } = string.Empty;
+
+        public int HasBreakingChange { get; init; }
+
+        public string TagsJson { get; init; } = "[]";
+
+        public string Reason { get; init; } = string.Empty;
     }
 }

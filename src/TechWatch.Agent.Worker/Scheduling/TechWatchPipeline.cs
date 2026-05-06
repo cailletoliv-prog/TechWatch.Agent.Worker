@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using TechWatch.Agent.Worker.Configuration;
+using TechWatch.Agent.Worker.Digests;
 using TechWatch.Agent.Worker.Filtering;
 using TechWatch.Agent.Worker.Llm;
 using TechWatch.Agent.Worker.Models;
@@ -13,6 +14,7 @@ public sealed class TechWatchPipeline(
     IContentFilter contentFilter,
     ITechItemRepository techItemRepository,
     IContentAnalyzer contentAnalyzer,
+    IDigestGenerator digestGenerator,
     IOptions<OllamaOptions> ollamaOptions,
     ILogger<TechWatchPipeline> logger)
 {
@@ -23,10 +25,13 @@ public sealed class TechWatchPipeline(
         await techItemRepository.InitializeAsync(cancellationToken);
 
         var items = await sourceAggregator.FetchAsync(cancellationToken);
+        logger.LogInformation("pipeline fetched items: {FetchedItemCount}", items.Count);
+
         if (items.Count == 0)
         {
             logger.LogInformation("pipeline completed: no items fetched");
             await AnalyzePendingItemsAsync(cancellationToken);
+            await GenerateDigestAsync(cancellationToken);
             return;
         }
 
@@ -68,7 +73,7 @@ public sealed class TechWatchPipeline(
         }
 
         logger.LogInformation(
-            "pipeline completed: total items {TotalItemCount}, relevant items {RelevantItemCount}, rejected items {RejectedItemCount}, stored items {StoredItemCount}, ignored items {IgnoredItemCount}",
+            "filtering completed: fetched items {TotalItemCount}, relevant items {RelevantItemCount}, rejected items {RejectedItemCount}, stored items {StoredItemCount}, ignored items {IgnoredItemCount}",
             items.Count,
             relevantCount,
             rejectedCount,
@@ -76,6 +81,7 @@ public sealed class TechWatchPipeline(
             ignoredCount);
 
         await AnalyzePendingItemsAsync(cancellationToken);
+        await GenerateDigestAsync(cancellationToken);
     }
 
     private async Task AnalyzePendingItemsAsync(CancellationToken cancellationToken)
@@ -131,6 +137,19 @@ public sealed class TechWatchPipeline(
             "analysis completed: analyzed items {AnalyzedItemCount}, failed items {FailedItemCount}",
             analyzedCount,
             failedCount);
+    }
+
+    private async Task GenerateDigestAsync(CancellationToken cancellationToken)
+    {
+        var runDate = DateTimeOffset.UtcNow;
+        var since = runDate.Date;
+        var entries = await techItemRepository.GetRecentAnalysisResultsAsync(since, cancellationToken);
+        var digestRun = await digestGenerator.GenerateAsync(entries, runDate, cancellationToken);
+
+        logger.LogInformation(
+            "digest generated: entries {EntryCount}; output {OutputPath}",
+            digestRun.Entries.Count,
+            digestRun.OutputPath);
     }
 
     private static TechItem MarkPendingAnalysis(TechItem item)

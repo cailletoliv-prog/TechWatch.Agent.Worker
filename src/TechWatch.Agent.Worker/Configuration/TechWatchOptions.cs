@@ -4,6 +4,8 @@ public sealed class TechWatchOptions
 {
     public const string SectionName = "TechWatch";
 
+    public bool RunOnce { get; init; } = true;
+
     public List<SourceOptions> Sources { get; init; } = [];
 
     public OllamaOptions Ollama { get; init; } = new();

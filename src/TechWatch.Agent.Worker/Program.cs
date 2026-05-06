@@ -1,4 +1,5 @@
 using TechWatch.Agent.Worker.Configuration;
+using TechWatch.Agent.Worker.Digests;
 using TechWatch.Agent.Worker.Filtering;
 using TechWatch.Agent.Worker.Llm;
 using TechWatch.Agent.Worker;
@@ -23,6 +24,10 @@ builder.Services
     .AddOptions<OllamaOptions>()
     .BindConfiguration($"{TechWatchOptions.SectionName}:Ollama")
     .ValidateDataAnnotations();
+builder.Services
+    .AddOptions<DigestOptions>()
+    .BindConfiguration($"{TechWatchOptions.SectionName}:Digest")
+    .ValidateDataAnnotations();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IContentFilter, KeywordContentFilter>();
@@ -32,6 +37,7 @@ builder.Services.AddSingleton<DatabaseInitializer>();
 builder.Services.AddSingleton<ITechItemRepository, SqliteTechItemRepository>();
 builder.Services.AddSingleton<IOllamaClient, OllamaClient>();
 builder.Services.AddSingleton<IContentAnalyzer, OllamaContentAnalyzer>();
+builder.Services.AddSingleton<IDigestGenerator, MarkdownDigestGenerator>();
 builder.Services.AddSingleton<TechWatchPipeline>();
 builder.Services.AddHostedService<Worker>();
 
