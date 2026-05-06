@@ -74,9 +74,11 @@ public sealed class OllamaContentAnalyzer(IOllamaClient ollamaClient) : IContent
 
             Scoring guidance:
             - 9-10: critical security, major confirmed breaking change, or strong direct impact for the profile.
-            - 7-8: important topic for architecture, framework usage, migration, performance, tooling, or roadmap.
+            - 7-8: important topic to watch or read for architecture, framework usage, migration, performance, tooling, or roadmap.
             - 5-6: interesting but optional.
-            - 0-4: low priority, marketing, duplicate, vague, or not directly useful for the profile.
+            - 3-4: low priority.
+            - 0-2: noise, marketing, duplicate, vague, inspirational, or not directly useful for the profile.
+            Do not over-score inspirational articles, demos, tutorials, or product showcases unless they contain concrete technical details, migration guidance, security information, or actionable engineering impact.
 
             Tags rules:
             - Use only topics explicitly present in the item.
@@ -85,7 +87,7 @@ public sealed class OllamaContentAnalyzer(IOllamaClient ollamaClient) : IContent
 
             Field guidance:
             - summary: 2-4 short factual sentences in natural professional French. Mention concrete impact only when supported by the item.
-            - reason: explain in natural professional French what to retain, or why it can be low priority.
+            - reason: justify the score in one factual sentence in natural professional French. Do not make unproven claims about our projects.
             - isBreakingChange: true only if the item mentions or strongly implies migration risk, removed APIs, changed defaults, incompatible behavior, or required action.
 
             Expected JSON shape:
