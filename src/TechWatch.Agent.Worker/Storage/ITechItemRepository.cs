@@ -4,15 +4,17 @@ namespace TechWatch.Agent.Worker.Storage;
 
 public interface ITechItemRepository
 {
-    Task SaveItemAsync(
+    Task InitializeAsync(CancellationToken cancellationToken);
+
+    Task<bool> UpsertAsync(
         TechItem item,
         CancellationToken cancellationToken);
 
-    Task SaveAnalysisAsync(
-        AnalysisResult analysisResult,
+    Task<bool> ExistsByUrlAsync(
+        string url,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyCollection<DigestEntry>> GetDigestEntriesAsync(
-        DateTimeOffset since,
+    Task<IReadOnlyCollection<TechItem>> GetPendingAnalysisAsync(
+        int limit,
         CancellationToken cancellationToken);
 }
