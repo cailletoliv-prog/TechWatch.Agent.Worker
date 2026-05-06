@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TechWatch.Agent.Worker.csproj" />
+    <ProjectReference Include="..\..\src\TechWatch.Agent.Worker\TechWatch.Agent.Worker.csproj" />
   </ItemGroup>
 
 </Project>

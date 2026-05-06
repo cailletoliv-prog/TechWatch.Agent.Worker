@@ -16,8 +16,4 @@
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
     <PackageReference Include="System.ServiceModel.Syndication" Version="8.0.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="TechWatch.Agent.Worker.Tests\**\*.cs" />
-  </ItemGroup>
 </Project>

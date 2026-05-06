@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="TechWatch.Agent.Worker.csproj" />
-  <Project Path="TechWatch.Agent.Worker.Tests/TechWatch.Agent.Worker.Tests.csproj" />
+  <Project Path="src/TechWatch.Agent.Worker/TechWatch.Agent.Worker.csproj" />
+  <Project Path="tests/TechWatch.Agent.Worker.Tests/TechWatch.Agent.Worker.Tests.csproj" />
 </Solution>
