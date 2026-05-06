@@ -1,7 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
+using TechWatch.Agent.Worker.Configuration;
 using TechWatch.Agent.Worker.Filtering;
+using TechWatch.Agent.Worker.Llm;
 using TechWatch.Agent.Worker.Models;
 using TechWatch.Agent.Worker.Scheduling;
 using TechWatch.Agent.Worker.Sources;
@@ -17,20 +20,25 @@ public sealed class TechWatchPipelineTests
         var sourceAggregator = Substitute.For<ISourceAggregator>();
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
+        var analyzer = Substitute.For<IContentAnalyzer>();
         var logger = new TestLogger<TechWatchPipeline>();
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
+        repository
+            .GetPendingAnalysisAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
-        var pipeline = new TechWatchPipeline(sourceAggregator, contentFilter, repository, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
         _ = repository.Received(1).InitializeAsync(Arg.Any<CancellationToken>());
         contentFilter.DidNotReceive().Evaluate(Arg.Any<TechItem>());
         _ = repository.DidNotReceive().UpsertAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>());
+        await analyzer.DidNotReceive().AnalyzeAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>());
         logger.Messages.Should().Contain(message => message.Contains("no items fetched"));
     }
 
@@ -40,11 +48,15 @@ public sealed class TechWatchPipelineTests
         var sourceAggregator = Substitute.For<ISourceAggregator>();
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
+        var analyzer = Substitute.For<IContentAnalyzer>();
         var logger = new TestLogger<TechWatchPipeline>();
         var item = CreateItem("ASP.NET Core release notes");
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
+        repository
+            .GetPendingAnalysisAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([item]));
@@ -59,7 +71,7 @@ public sealed class TechWatchPipelineTests
         repository
             .UpsertAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
-        var pipeline = new TechWatchPipeline(sourceAggregator, contentFilter, repository, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
@@ -80,11 +92,15 @@ public sealed class TechWatchPipelineTests
         var sourceAggregator = Substitute.For<ISourceAggregator>();
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
+        var analyzer = Substitute.For<IContentAnalyzer>();
         var logger = new TestLogger<TechWatchPipeline>();
         var item = CreateItem("Crypto marketing campaign");
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
+        repository
+            .GetPendingAnalysisAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([item]));
@@ -96,7 +112,7 @@ public sealed class TechWatchPipelineTests
                 Score = 0,
                 Reason = "Rejected by test."
             });
-        var pipeline = new TechWatchPipeline(sourceAggregator, contentFilter, repository, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
 
         await pipeline.RunAsync(CancellationToken.None);
 
@@ -112,6 +128,7 @@ public sealed class TechWatchPipelineTests
         var sourceAggregator = Substitute.For<ISourceAggregator>();
         var contentFilter = Substitute.For<IContentFilter>();
         var repository = Substitute.For<ITechItemRepository>();
+        var analyzer = Substitute.For<IContentAnalyzer>();
         var logger = new TestLogger<TechWatchPipeline>();
         repository
             .InitializeAsync(Arg.Any<CancellationToken>())
@@ -119,7 +136,7 @@ public sealed class TechWatchPipelineTests
         sourceAggregator
             .FetchAsync(Arg.Any<CancellationToken>())
             .Returns<Task<IReadOnlyCollection<TechItem>>>(_ => throw new InvalidOperationException("Fetch failed."));
-        var pipeline = new TechWatchPipeline(sourceAggregator, contentFilter, repository, logger);
+        var pipeline = CreatePipeline(sourceAggregator, contentFilter, repository, analyzer, logger);
 
         var act = () => pipeline.RunAsync(CancellationToken.None);
 
@@ -127,6 +144,60 @@ public sealed class TechWatchPipelineTests
             .WithMessage("Fetch failed.");
         _ = repository.Received(1).InitializeAsync(Arg.Any<CancellationToken>());
         contentFilter.DidNotReceive().Evaluate(Arg.Any<TechItem>());
+    }
+
+    [Fact]
+    public async Task Run_async_analyzes_no_more_than_configured_limit()
+    {
+        var sourceAggregator = Substitute.For<ISourceAggregator>();
+        var contentFilter = Substitute.For<IContentFilter>();
+        var repository = Substitute.For<ITechItemRepository>();
+        var analyzer = Substitute.For<IContentAnalyzer>();
+        var logger = new TestLogger<TechWatchPipeline>();
+        var pendingItems = new[]
+        {
+            CreateItem("Pending item 1"),
+            CreateItem("Pending item 2")
+        };
+        repository
+            .InitializeAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        sourceAggregator
+            .FetchAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([]));
+        repository
+            .GetPendingAnalysisAsync(1, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyCollection<TechItem>>([pendingItems[0]]));
+        analyzer
+            .AnalyzeAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var item = call.Arg<TechItem>();
+                return Task.FromResult(new AnalysisResult
+                {
+                    TechItemId = item.Id,
+                    InterestScore = 7,
+                    Summary = "Useful.",
+                    Importance = "Medium",
+                    Reason = "Relevant."
+                });
+            });
+        repository
+            .SaveAnalysisAsync(Arg.Any<AnalysisResult>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var pipeline = CreatePipeline(
+            sourceAggregator,
+            contentFilter,
+            repository,
+            analyzer,
+            logger,
+            maxItemsPerRun: 1);
+
+        await pipeline.RunAsync(CancellationToken.None);
+
+        _ = repository.Received(1).GetPendingAnalysisAsync(1, Arg.Any<CancellationToken>());
+        await analyzer.Received(1).AnalyzeAsync(Arg.Any<TechItem>(), Arg.Any<CancellationToken>());
+        _ = repository.Received(1).SaveAnalysisAsync(Arg.Any<AnalysisResult>(), Arg.Any<CancellationToken>());
     }
 
     private static TechItem CreateItem(string title)
@@ -140,6 +211,26 @@ public sealed class TechWatchPipelineTests
             Url = "https://example.com/item",
             PublishedAt = DateTimeOffset.Parse("2026-05-06T08:00:00Z")
         };
+    }
+
+    private static TechWatchPipeline CreatePipeline(
+        ISourceAggregator sourceAggregator,
+        IContentFilter contentFilter,
+        ITechItemRepository repository,
+        IContentAnalyzer analyzer,
+        ILogger<TechWatchPipeline> logger,
+        int maxItemsPerRun = 5)
+    {
+        return new TechWatchPipeline(
+            sourceAggregator,
+            contentFilter,
+            repository,
+            analyzer,
+            Options.Create(new OllamaOptions
+            {
+                MaxItemsPerRun = maxItemsPerRun
+            }),
+            logger);
     }
 
     private sealed class TestLogger<T> : ILogger<T>

@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using TechWatch.Agent.Worker.Configuration;
 using TechWatch.Agent.Worker.Models;
 
@@ -124,6 +125,92 @@ public sealed class SqliteTechItemRepository(
                 cancellationToken: cancellationToken));
 
         return rows.Select(ToTechItem).ToArray();
+    }
+
+    public async Task SaveAnalysisAsync(
+        AnalysisResult analysisResult,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var now = DateTimeOffset.UtcNow.ToString("O");
+        await connection.ExecuteAsync(
+            new CommandDefinition(
+                """
+                INSERT OR REPLACE INTO AnalysisResults (
+                    Id,
+                    TechItemId,
+                    InterestScore,
+                    Summary,
+                    Importance,
+                    HasBreakingChange,
+                    TagsJson,
+                    Reason,
+                    AnalyzedAt,
+                    CreatedAt
+                )
+                VALUES (
+                    @Id,
+                    @TechItemId,
+                    @InterestScore,
+                    @Summary,
+                    @Importance,
+                    @HasBreakingChange,
+                    @TagsJson,
+                    @Reason,
+                    @AnalyzedAt,
+                    @CreatedAt
+                );
+
+                UPDATE TechItems
+                SET Status = @AnalyzedStatus,
+                    UpdatedAt = @CreatedAt
+                WHERE Id = @TechItemId;
+                """,
+                new
+                {
+                    Id = analysisResult.Id.ToString(),
+                    TechItemId = analysisResult.TechItemId.ToString(),
+                    analysisResult.InterestScore,
+                    analysisResult.Summary,
+                    analysisResult.Importance,
+                    HasBreakingChange = analysisResult.HasBreakingChange ? 1 : 0,
+                    TagsJson = JsonSerializer.Serialize(analysisResult.Tags),
+                    analysisResult.Reason,
+                    AnalyzedAt = analysisResult.AnalyzedAt.ToString("O"),
+                    CreatedAt = now,
+                    AnalyzedStatus = (int)TechItemStatus.Analyzed
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task MarkAnalysisFailedAsync(
+        Guid techItemId,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await connection.ExecuteAsync(
+            new CommandDefinition(
+                """
+                UPDATE TechItems
+                SET Status = @Status,
+                    UpdatedAt = @UpdatedAt
+                WHERE Id = @Id;
+                """,
+                new
+                {
+                    Id = techItemId.ToString(),
+                    Status = (int)TechItemStatus.AnalysisFailed,
+                    UpdatedAt = DateTimeOffset.UtcNow.ToString("O")
+                },
+                cancellationToken: cancellationToken));
     }
 
     private static TechItem ToTechItem(TechItemRow row)

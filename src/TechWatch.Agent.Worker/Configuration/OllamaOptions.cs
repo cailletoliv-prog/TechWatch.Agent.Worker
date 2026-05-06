@@ -7,4 +7,6 @@ public sealed class OllamaOptions
     public string Model { get; init; } = "llama3.1";
 
     public int TimeoutSeconds { get; init; } = 120;
+
+    public int MaxItemsPerRun { get; init; } = 5;
 }

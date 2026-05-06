@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Dapper;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 using TechWatch.Agent.Worker.Configuration;
 using TechWatch.Agent.Worker.Models;
@@ -59,6 +61,37 @@ public sealed class SqliteTechItemRepositoryTests : IDisposable
         var item = items.Should().ContainSingle().Subject;
         item.Url.Should().Be(pending.Url);
         item.Status.Should().Be(TechItemStatus.PendingAnalysis);
+    }
+
+    [Fact]
+    public async Task Save_analysis_async_persists_result_and_marks_item_analyzed()
+    {
+        var repository = CreateRepository();
+        var item = CreateItem("https://example.com/analyze-me", TechItemStatus.PendingAnalysis);
+
+        await repository.InitializeAsync(CancellationToken.None);
+        await repository.UpsertAsync(item, CancellationToken.None);
+        await repository.SaveAnalysisAsync(
+            new AnalysisResult
+            {
+                TechItemId = item.Id,
+                InterestScore = 9,
+                Summary = "Very relevant.",
+                Importance = "High",
+                HasBreakingChange = true,
+                Tags = ["dotnet"],
+                Reason = "Important release."
+            },
+            CancellationToken.None);
+
+        var pendingItems = await repository.GetPendingAnalysisAsync(10, CancellationToken.None);
+        pendingItems.Should().BeEmpty();
+
+        await using var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False");
+        var count = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(1) FROM AnalysisResults WHERE TechItemId = @TechItemId;",
+            new { TechItemId = item.Id.ToString() });
+        count.Should().Be(1);
     }
 
     public void Dispose()

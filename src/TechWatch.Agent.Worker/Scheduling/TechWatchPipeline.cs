@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
+using TechWatch.Agent.Worker.Configuration;
 using TechWatch.Agent.Worker.Filtering;
+using TechWatch.Agent.Worker.Llm;
 using TechWatch.Agent.Worker.Models;
 using TechWatch.Agent.Worker.Sources;
 using TechWatch.Agent.Worker.Storage;
@@ -9,6 +12,8 @@ public sealed class TechWatchPipeline(
     ISourceAggregator sourceAggregator,
     IContentFilter contentFilter,
     ITechItemRepository techItemRepository,
+    IContentAnalyzer contentAnalyzer,
+    IOptions<OllamaOptions> ollamaOptions,
     ILogger<TechWatchPipeline> logger)
 {
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -21,6 +26,7 @@ public sealed class TechWatchPipeline(
         if (items.Count == 0)
         {
             logger.LogInformation("pipeline completed: no items fetched");
+            await AnalyzePendingItemsAsync(cancellationToken);
             return;
         }
 
@@ -68,6 +74,63 @@ public sealed class TechWatchPipeline(
             rejectedCount,
             storedCount,
             ignoredCount);
+
+        await AnalyzePendingItemsAsync(cancellationToken);
+    }
+
+    private async Task AnalyzePendingItemsAsync(CancellationToken cancellationToken)
+    {
+        var pendingItems = await techItemRepository.GetPendingAnalysisAsync(
+            ollamaOptions.Value.MaxItemsPerRun,
+            cancellationToken);
+
+        if (pendingItems.Count == 0)
+        {
+            logger.LogInformation("analysis completed: no pending items");
+            return;
+        }
+
+        var analyzedCount = 0;
+        var failedCount = 0;
+
+        foreach (var item in pendingItems)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var analysis = await contentAnalyzer.AnalyzeAsync(item, cancellationToken);
+                await techItemRepository.SaveAnalysisAsync(analysis, cancellationToken);
+                analyzedCount++;
+
+                logger.LogInformation(
+                    "analysis completed for item: score {Score}; title {Title}; source {SourceName}; url {Url}",
+                    analysis.InterestScore,
+                    item.Title,
+                    item.SourceName,
+                    item.Url);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failedCount++;
+                await techItemRepository.MarkAnalysisFailedAsync(item.Id, cancellationToken);
+                logger.LogWarning(
+                    exception,
+                    "analysis failed for item: title {Title}; source {SourceName}; url {Url}",
+                    item.Title,
+                    item.SourceName,
+                    item.Url);
+            }
+        }
+
+        logger.LogInformation(
+            "analysis completed: analyzed items {AnalyzedItemCount}, failed items {FailedItemCount}",
+            analyzedCount,
+            failedCount);
     }
 
     private static TechItem MarkPendingAnalysis(TechItem item)

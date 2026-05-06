@@ -6,5 +6,6 @@ public enum TechItemStatus
     FilteredOut = 2,
     PendingAnalysis = 3,
     Analyzed = 4,
-    IncludedInDigest = 5
+    IncludedInDigest = 5,
+    AnalysisFailed = 6
 }

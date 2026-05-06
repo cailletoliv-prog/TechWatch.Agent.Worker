@@ -16,5 +16,7 @@ public sealed class AnalysisResult
 
     public IReadOnlyCollection<string> Tags { get; init; } = [];
 
+    public string Reason { get; init; } = string.Empty;
+
     public DateTimeOffset AnalyzedAt { get; init; } = DateTimeOffset.UtcNow;
 }

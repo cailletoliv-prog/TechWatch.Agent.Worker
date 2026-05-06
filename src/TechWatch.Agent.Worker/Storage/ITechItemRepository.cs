@@ -17,4 +17,12 @@ public interface ITechItemRepository
     Task<IReadOnlyCollection<TechItem>> GetPendingAnalysisAsync(
         int limit,
         CancellationToken cancellationToken);
+
+    Task SaveAnalysisAsync(
+        AnalysisResult analysisResult,
+        CancellationToken cancellationToken);
+
+    Task MarkAnalysisFailedAsync(
+        Guid techItemId,
+        CancellationToken cancellationToken);
 }

@@ -33,6 +33,23 @@ public sealed class DatabaseInitializer(IOptions<StorageOptions> options)
                     UpdatedAt TEXT NOT NULL,
                     CONSTRAINT UX_TechItems_Url UNIQUE (Url)
                 );
+
+                CREATE TABLE IF NOT EXISTS AnalysisResults (
+                    Id TEXT NOT NULL PRIMARY KEY,
+                    TechItemId TEXT NOT NULL,
+                    InterestScore INTEGER NOT NULL,
+                    Summary TEXT NOT NULL,
+                    Importance TEXT NOT NULL,
+                    HasBreakingChange INTEGER NOT NULL,
+                    TagsJson TEXT NOT NULL,
+                    Reason TEXT NOT NULL,
+                    AnalyzedAt TEXT NOT NULL,
+                    CreatedAt TEXT NOT NULL,
+                    CONSTRAINT UX_AnalysisResults_TechItemId UNIQUE (TechItemId),
+                    CONSTRAINT FK_AnalysisResults_TechItems
+                        FOREIGN KEY (TechItemId)
+                        REFERENCES TechItems (Id)
+                );
                 """,
                 cancellationToken: cancellationToken));
     }
