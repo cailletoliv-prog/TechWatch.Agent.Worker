@@ -4,5 +4,5 @@ namespace TechWatch.Agent.Worker.Filtering;
 
 public interface IContentFilter
 {
-    bool IsRelevant(TechItem item);
+    ContentFilterResult Evaluate(TechItem item);
 }

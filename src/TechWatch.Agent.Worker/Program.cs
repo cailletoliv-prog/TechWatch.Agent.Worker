@@ -1,4 +1,5 @@
 using TechWatch.Agent.Worker.Configuration;
+using TechWatch.Agent.Worker.Filtering;
 using TechWatch.Agent.Worker;
 using TechWatch.Agent.Worker.Scheduling;
 
@@ -7,7 +8,12 @@ builder.Services
     .AddOptions<TechWatchOptions>()
     .BindConfiguration(TechWatchOptions.SectionName)
     .ValidateDataAnnotations();
+builder.Services
+    .AddOptions<FilterOptions>()
+    .BindConfiguration($"{TechWatchOptions.SectionName}:Filtering")
+    .ValidateDataAnnotations();
 
+builder.Services.AddSingleton<IContentFilter, KeywordContentFilter>();
 builder.Services.AddSingleton<TechWatchPipeline>();
 builder.Services.AddHostedService<Worker>();
 

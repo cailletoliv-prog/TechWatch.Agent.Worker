@@ -8,6 +8,8 @@ public sealed class TechWatchOptions
 
     public OllamaOptions Ollama { get; init; } = new();
 
+    public FilterOptions Filtering { get; init; } = new();
+
     public DigestOptions Digest { get; init; } = new();
 
     public StorageOptions Storage { get; init; } = new();
